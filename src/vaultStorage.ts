@@ -1,6 +1,8 @@
 import type { EncryptedVault } from './types';
 
 export const VAULT_STORAGE_KEY = 'local_secure_vault';
+export const VAULT_RESET_MARKER_KEY = 'local_secure_vault_reset_marker';
+export const VAULT_RESET_MARKER_VERSION = '2026-06-07-clear-test-data';
 
 let accessLevelConfigured = false;
 
@@ -107,4 +109,23 @@ export async function clearVault(): Promise<void> {
   }
 
   getLocalStorage().removeItem(VAULT_STORAGE_KEY);
+}
+
+export async function loadVaultResetMarker(): Promise<string | null> {
+  const chromeStorage = getChromeStorage();
+  if (chromeStorage) {
+    return chromeGet<string>(chromeStorage, VAULT_RESET_MARKER_KEY);
+  }
+
+  return getLocalStorage().getItem(VAULT_RESET_MARKER_KEY);
+}
+
+export async function saveVaultResetMarker(version: string): Promise<void> {
+  const chromeStorage = getChromeStorage();
+  if (chromeStorage) {
+    await chromeSet(chromeStorage, VAULT_RESET_MARKER_KEY, version);
+    return;
+  }
+
+  getLocalStorage().setItem(VAULT_RESET_MARKER_KEY, version);
 }

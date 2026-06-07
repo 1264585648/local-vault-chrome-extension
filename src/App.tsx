@@ -34,7 +34,7 @@ import {
 import { getTotpTimeLeft, generateTotp } from './totp';
 import type { Credential, EncryptedVault } from './types';
 import { decryptVault, encryptVault } from './vaultCrypto';
-import { resetVaultData } from './vaultReset';
+import { resetVaultData, resetVaultDataForFreshStart } from './vaultReset';
 import { loadVault, saveVault } from './vaultStorage';
 
 type AppState = 'loading' | 'setup' | 'locked' | 'unlocked';
@@ -141,6 +141,7 @@ export default function App() {
     let alive = true;
     async function initialize() {
       try {
+        const clearedStartupData = await resetVaultDataForFreshStart();
         const savedVault = await loadVault();
         if (!alive) {
           return;
@@ -150,6 +151,9 @@ export default function App() {
         if (!savedVault) {
           await clearSession();
           setAppState('setup');
+          if (clearedStartupData) {
+            setStatusMessage('测试数据已清空，可留空主密码创建金库');
+          }
           return;
         }
 
