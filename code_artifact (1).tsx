@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Plus, Trash2, Copy, Lock, Unlock, Search, Clock, Download, Upload, AlertCircle, FileJson, Globe, KeyRound, Edit2, Wand2, Eye, EyeOff } from 'lucide-react';
+import { Shield, Plus, Trash2, Copy, LogOut, Unlock, Search, Clock, Download, Upload, AlertCircle, FileJson, Globe, KeyRound, Edit2, Wand2, Eye, EyeOff } from 'lucide-react';
 
 // ==========================================
 // 1. 本地加密与解密工具 (Web Crypto API)
@@ -176,7 +176,7 @@ export default function PasswordManagerApp() {
       setCredentials([]);
       setAppState(3);
     } catch (err) {
-      setAuthError('创建保管库失败');
+      setAuthError('创建密码库失败');
     }
   };
 
@@ -397,11 +397,11 @@ export default function PasswordManagerApp() {
             <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
               <Shield className="w-5 h-5 text-white" />
             </div>
-            <h1 className="font-bold text-lg text-white">本地私密金库</h1>
+            <h1 className="font-bold text-lg text-white">本地密码库</h1>
           </div>
           {appState === 3 && (
             <button onClick={lockVault} className="flex items-center gap-1.5 text-sm text-indigo-100 hover:text-white transition-colors bg-indigo-700/50 hover:bg-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-500/30">
-              <Lock className="w-4 h-4" /> 锁定
+              <LogOut className="w-4 h-4" /> 退出登陆
             </button>
           )}
         </header>
@@ -414,7 +414,7 @@ export default function PasswordManagerApp() {
                 <KeyRound className="w-8 h-8 text-indigo-600" />
               </div>
               <h2 className="text-2xl font-bold text-slate-800 mb-2">
-                {appState === 1 ? '设置主密码' : '解锁金库'}
+                {appState === 1 ? '设置主密码' : '解锁密码库'}
               </h2>
               <p className="text-slate-500 text-sm leading-relaxed">
                 {appState === 1 
@@ -434,7 +434,7 @@ export default function PasswordManagerApp() {
               {authError && <p className="text-red-500 text-sm text-center font-medium">{authError}</p>}
               <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
                 <Unlock className="w-5 h-5" />
-                {appState === 1 ? '加密并创建本地金库' : '解密并进入'}
+                {appState === 1 ? '加密并创建本地密码库' : '解密并进入'}
               </button>
             </form>
           </div>
@@ -661,7 +661,7 @@ function CompactRow({ data, onEdit, onDelete }) {
             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-all"
             title={data.password ? "点击复制密码" : "未填写密码"}
           >
-            <Lock className="w-4 h-4" />
+            <Copy className="w-4 h-4" />
           </button>
           <button 
             onClick={onEdit}

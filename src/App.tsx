@@ -9,6 +9,7 @@ import {
   FileJson,
   KeyRound,
   Lock,
+  LogOut,
   Plus,
   Search,
   Shield,
@@ -34,7 +35,6 @@ import {
 import { getTotpTimeLeft, generateTotp } from './totp';
 import type { Credential, EncryptedVault } from './types';
 import { decryptVault, encryptVault } from './vaultCrypto';
-import { resetVaultData, resetVaultDataForFreshStart } from './vaultReset';
 import { loadVault, saveVault } from './vaultStorage';
 
 type AppState = 'loading' | 'setup' | 'locked' | 'unlocked';
@@ -141,7 +141,6 @@ export default function App() {
     let alive = true;
     async function initialize() {
       try {
-        const clearedStartupData = await resetVaultDataForFreshStart();
         const savedVault = await loadVault();
         if (!alive) {
           return;
@@ -151,9 +150,6 @@ export default function App() {
         if (!savedVault) {
           await clearSession();
           setAppState('setup');
-          if (clearedStartupData) {
-            setStatusMessage('测试数据已清空，可留空主密码创建金库');
-          }
           return;
         }
 
@@ -176,7 +172,7 @@ export default function App() {
         setAppState('locked');
       } catch {
         if (alive) {
-          setAuthError('读取本地金库失败');
+          setAuthError('读取本地密码库失败');
           setAppState('setup');
         }
       }
@@ -248,7 +244,7 @@ export default function App() {
 
   async function persistCredentials(nextCredentials: Credential[]) {
     if (!vault) {
-      throw new Error('金库尚未初始化');
+      throw new Error('密码库尚未初始化');
     }
 
     const operationEpoch = lockEpochRef.current;
@@ -278,9 +274,9 @@ export default function App() {
       setVault(encryptedVault);
       setCredentials([]);
       setAppState('unlocked');
-      setStatusMessage(shouldWarnAboutEmptyMasterPassword(masterPassword) ? EMPTY_MASTER_PASSWORD_WARNING : '金库已创建');
+      setStatusMessage(shouldWarnAboutEmptyMasterPassword(masterPassword) ? EMPTY_MASTER_PASSWORD_WARNING : '密码库已创建');
     } catch {
-      setAuthError('创建金库失败，请确认浏览器支持 Web Crypto');
+      setAuthError('创建密码库失败，请确认浏览器支持 Web Crypto');
     }
   }
 
@@ -301,13 +297,13 @@ export default function App() {
       setVault(savedVault);
       setCredentials(decrypted);
       setAppState('unlocked');
-      setStatusMessage(shouldWarnAboutEmptyMasterPassword(masterPassword) ? EMPTY_MASTER_PASSWORD_WARNING : '金库已解锁');
+      setStatusMessage(shouldWarnAboutEmptyMasterPassword(masterPassword) ? EMPTY_MASTER_PASSWORD_WARNING : '密码库已解锁');
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : '解锁失败');
     }
   }
 
-  async function lockVault(shouldClearSession = true, message = '已锁定') {
+  async function lockVault(shouldClearSession = true, message = '已退出登陆') {
     lockEpochRef.current += 1;
     if (shouldClearSession) {
       await clearSession();
@@ -327,32 +323,6 @@ export default function App() {
     setRemainingSeconds(null);
     setAppState(vault ? 'locked' : 'setup');
     setStatusMessage(message);
-  }
-
-  async function handleResetVaultData() {
-    if (!window.confirm('确定清空当前设备上的所有金库数据和短时会话吗？此操作不可恢复。')) {
-      return;
-    }
-
-    lockEpochRef.current += 1;
-
-    try {
-      await resetVaultData();
-      setVault(null);
-      setCredentials([]);
-      setMasterPassword('');
-      setShowMasterPassword(false);
-      setAuthError('');
-      setSearchTerm('');
-      resetForm();
-      resetMasterPasswordChange();
-      setSessionExpiresAt(null);
-      setRemainingSeconds(null);
-      setAppState('setup');
-      setStatusMessage('金库数据已清空');
-    } catch {
-      setStatusMessage('清空金库数据失败，请稍后重试');
-    }
   }
 
   function resetMasterPasswordChange() {
@@ -379,7 +349,7 @@ export default function App() {
     setChangeMasterError('');
 
     if (!vault) {
-      setChangeMasterError('金库尚未初始化');
+      setChangeMasterError('密码库尚未初始化');
       return;
     }
 
@@ -600,7 +570,7 @@ export default function App() {
             <Shield size={21} aria-hidden="true" />
           </div>
           <div>
-            <h1>本地私密金库</h1>
+            <h1>本地密码库</h1>
             <p>{appState === 'unlocked' ? `${credentials.length} 条记录` : '离线加密保存'}</p>
           </div>
         </div>
@@ -613,8 +583,8 @@ export default function App() {
               onChange={event => void handleSessionDurationChange(event.target.value)}
             />
             <button className="ghost-button header-lock" type="button" onClick={() => void lockVault()}>
-              <Lock size={16} aria-hidden="true" />
-              锁定
+              <LogOut size={16} aria-hidden="true" />
+              退出登陆
             </button>
           </div>
         )}
@@ -625,7 +595,7 @@ export default function App() {
           <div className="auth-icon">
             <KeyRound size={34} aria-hidden="true" />
           </div>
-          <h2>{authMode === 'setup' ? '设置主密码' : '解锁金库'}</h2>
+          <h2>{authMode === 'setup' ? '设置主密码' : '解锁密码库'}</h2>
           <p className="auth-copy">
             {authMode === 'setup'
               ? '数据只保存在本机插件存储中，使用主密码派生密钥后加密。请记住主密码，丢失后无法恢复。'
@@ -661,13 +631,13 @@ export default function App() {
               </p>
             )}
             <button className="primary-button" type="submit">
-              {authMode === 'setup' ? '加密并创建金库' : '解锁并进入'}
+              {authMode === 'setup' ? '加密并创建密码库' : '解锁并进入'}
             </button>
           </form>
         </main>
       ) : (
         <main className="vault-panel">
-          <section className="toolbar" aria-label="金库工具栏">
+          <section className="toolbar" aria-label="密码库工具栏">
             <div className="search-box">
               <Search size={17} aria-hidden="true" />
               <input
@@ -686,14 +656,6 @@ export default function App() {
             </button>
             <button className="icon-button" type="button" title="导出明文 JSON" onClick={handlePlaintextExport}>
               <Download size={18} aria-hidden="true" />
-            </button>
-            <button
-              className="icon-button danger"
-              type="button"
-              title="清空金库数据"
-              onClick={() => void handleResetVaultData()}
-            >
-              <Trash2 size={18} aria-hidden="true" />
             </button>
             <button
               className="icon-button"
@@ -982,7 +944,7 @@ function CredentialRow({ credential, onCopy, onDelete, onEdit }: CredentialRowPr
             disabled={!credential.password}
             onClick={() => onCopy(credential.password, '密码')}
           >
-            <Lock size={17} aria-hidden="true" />
+            <Copy size={17} aria-hidden="true" />
           </button>
           <button className="icon-button" type="button" title="编辑" onClick={onEdit}>
             <Edit2 size={17} aria-hidden="true" />

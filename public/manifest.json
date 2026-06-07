@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "本地私密金库",
+  "name": "本地密码库",
   "description": "离线优先的本地密码管理器原型，使用主密码加密保存账号记录。",
   "version": "0.1.0",
   "action": {
-    "default_title": "本地私密金库",
+    "default_title": "本地密码库",
     "default_popup": "index.html",
     "default_icon": {
       "16": "icons/icon16.png",

@@ -28,7 +28,7 @@ describe('vault crypto', () => {
     const encrypted = await encryptVault([], 'right-password');
 
     await expect(decryptVault(encrypted, 'wrong-password')).rejects.toThrow(
-      '主密码不正确或金库数据已损坏'
+      '主密码不正确或密码库数据已损坏'
     );
   });
 

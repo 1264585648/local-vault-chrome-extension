@@ -344,7 +344,7 @@ input:focus {
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(5, 36px) auto;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 36px) auto;
   gap: 8px;
   padding: 12px;
   border-bottom: 1px solid var(--line);

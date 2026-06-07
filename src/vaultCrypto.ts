@@ -112,6 +112,6 @@ export async function decryptVault(
 
     return JSON.parse(decoder.decode(decrypted)) as Credential[];
   } catch {
-    throw new Error('主密码不正确或金库数据已损坏');
+    throw new Error('主密码不正确或密码库数据已损坏');
   }
 }
