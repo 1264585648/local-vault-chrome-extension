@@ -19,6 +19,11 @@ import {
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createEncryptedBackup, decryptEncryptedBackup, isEncryptedBackup } from './encryptedBackup';
 import { parseCredentialImport, rekeyImportedCredentials, toPlaintextExport } from './importExport';
+import {
+  EMPTY_MASTER_PASSWORD_WARNING,
+  MASTER_PASSWORD_RECOVERY_WARNING,
+  shouldWarnAboutEmptyMasterPassword
+} from './masterPasswordPolicy';
 import { generatePassword, isValidTotpSecret } from './passwordTools';
 import { clearSession, restoreSession, saveSession } from './sessionClient';
 import {
@@ -29,6 +34,7 @@ import {
 import { getTotpTimeLeft, generateTotp } from './totp';
 import type { Credential, EncryptedVault } from './types';
 import { decryptVault, encryptVault } from './vaultCrypto';
+import { resetVaultData } from './vaultReset';
 import { loadVault, saveVault } from './vaultStorage';
 
 type AppState = 'loading' | 'setup' | 'locked' | 'unlocked';
@@ -113,11 +119,16 @@ export default function App() {
   const [vault, setVault] = useState<EncryptedVault | null>(null);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [masterPassword, setMasterPassword] = useState('');
+  const [showMasterPassword, setShowMasterPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<CredentialForm>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isChangeMasterOpen, setIsChangeMasterOpen] = useState(false);
+  const [nextMasterPassword, setNextMasterPassword] = useState('');
+  const [showNextMasterPassword, setShowNextMasterPassword] = useState(false);
+  const [changeMasterError, setChangeMasterError] = useState('');
   const [showFormPassword, setShowFormPassword] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [sessionDuration, setSessionDuration] = useState<SessionDurationMinutes>(15);
@@ -150,7 +161,11 @@ export default function App() {
           setSessionExpiresAt(restoredSession.status.expiresAt);
           setSessionDuration(restoredSession.status.durationMinutes);
           setAppState('unlocked');
-          setStatusMessage('已恢复短时会话');
+          setStatusMessage(
+            shouldWarnAboutEmptyMasterPassword(restoredSession.payload.masterPassword)
+              ? EMPTY_MASTER_PASSWORD_WARNING
+              : '已恢复短时会话'
+          );
           return;
         }
 
@@ -174,7 +189,10 @@ export default function App() {
       return;
     }
 
-    const timer = window.setTimeout(() => setStatusMessage(''), 2200);
+    const timer = window.setTimeout(
+      () => setStatusMessage(''),
+      statusMessage === EMPTY_MASTER_PASSWORD_WARNING ? 5200 : 2200
+    );
     return () => window.clearTimeout(timer);
   }, [statusMessage]);
 
@@ -246,10 +264,7 @@ export default function App() {
     event.preventDefault();
     setAuthError('');
 
-    if (masterPassword.length < 8) {
-      setAuthError('主密码至少需要 8 个字符');
-      return;
-    }
+    window.alert(MASTER_PASSWORD_RECOVERY_WARNING);
 
     try {
       const encryptedVault = await encryptVault([], masterPassword);
@@ -259,7 +274,7 @@ export default function App() {
       setVault(encryptedVault);
       setCredentials([]);
       setAppState('unlocked');
-      setStatusMessage('金库已创建');
+      setStatusMessage(shouldWarnAboutEmptyMasterPassword(masterPassword) ? EMPTY_MASTER_PASSWORD_WARNING : '金库已创建');
     } catch {
       setAuthError('创建金库失败，请确认浏览器支持 Web Crypto');
     }
@@ -282,7 +297,7 @@ export default function App() {
       setVault(savedVault);
       setCredentials(decrypted);
       setAppState('unlocked');
-      setStatusMessage('金库已解锁');
+      setStatusMessage(shouldWarnAboutEmptyMasterPassword(masterPassword) ? EMPTY_MASTER_PASSWORD_WARNING : '金库已解锁');
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : '解锁失败');
     }
@@ -295,14 +310,95 @@ export default function App() {
     }
     setCredentials([]);
     setMasterPassword('');
+    setShowMasterPassword(false);
     setFormData(EMPTY_FORM);
     setEditingId(null);
     setIsFormOpen(false);
+    setIsChangeMasterOpen(false);
+    setNextMasterPassword('');
+    setShowNextMasterPassword(false);
+    setChangeMasterError('');
     setShowFormPassword(false);
     setSessionExpiresAt(null);
     setRemainingSeconds(null);
     setAppState(vault ? 'locked' : 'setup');
     setStatusMessage(message);
+  }
+
+  async function handleResetVaultData() {
+    if (!window.confirm('确定清空当前设备上的所有金库数据和短时会话吗？此操作不可恢复。')) {
+      return;
+    }
+
+    lockEpochRef.current += 1;
+
+    try {
+      await resetVaultData();
+      setVault(null);
+      setCredentials([]);
+      setMasterPassword('');
+      setShowMasterPassword(false);
+      setAuthError('');
+      setSearchTerm('');
+      resetForm();
+      resetMasterPasswordChange();
+      setSessionExpiresAt(null);
+      setRemainingSeconds(null);
+      setAppState('setup');
+      setStatusMessage('金库数据已清空');
+    } catch {
+      setStatusMessage('清空金库数据失败，请稍后重试');
+    }
+  }
+
+  function resetMasterPasswordChange() {
+    setIsChangeMasterOpen(false);
+    setNextMasterPassword('');
+    setShowNextMasterPassword(false);
+    setChangeMasterError('');
+  }
+
+  function toggleMasterPasswordChange() {
+    const shouldOpen = !isChangeMasterOpen;
+    if (shouldOpen) {
+      resetForm();
+    }
+
+    setIsChangeMasterOpen(shouldOpen);
+    setNextMasterPassword('');
+    setShowNextMasterPassword(false);
+    setChangeMasterError('');
+  }
+
+  async function handleChangeMasterPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setChangeMasterError('');
+
+    if (!vault) {
+      setChangeMasterError('金库尚未初始化');
+      return;
+    }
+
+    try {
+      const operationEpoch = lockEpochRef.current;
+      const sorted = sortCredentials(credentials);
+      const encryptedVault = await encryptVault(sorted, nextMasterPassword);
+      await saveVault(encryptedVault);
+      if (operationEpoch !== lockEpochRef.current) {
+        return;
+      }
+
+      await saveSessionForDuration(sessionDuration, sorted, nextMasterPassword);
+      setVault(encryptedVault);
+      setMasterPassword(nextMasterPassword);
+      setCredentials(sorted);
+      resetMasterPasswordChange();
+      setStatusMessage(
+        shouldWarnAboutEmptyMasterPassword(nextMasterPassword) ? EMPTY_MASTER_PASSWORD_WARNING : '主密码已更改'
+      );
+    } catch {
+      setChangeMasterError('更改主密码失败，请稍后重试');
+    }
   }
 
   function resetForm() {
@@ -313,6 +409,7 @@ export default function App() {
   }
 
   function openAddForm() {
+    resetMasterPasswordChange();
     setFormData(EMPTY_FORM);
     setEditingId(null);
     setIsFormOpen(true);
@@ -320,6 +417,7 @@ export default function App() {
   }
 
   function openEditForm(credential: Credential) {
+    resetMasterPasswordChange();
     setFormData({
       website: credential.website,
       username: credential.username,
@@ -535,15 +633,23 @@ export default function App() {
               remainingSeconds={null}
               onChange={event => void handleSessionDurationChange(event.target.value)}
             />
-            <input
-              autoFocus
-              type="password"
-              value={masterPassword}
-              onChange={event => setMasterPassword(event.target.value)}
-              placeholder="输入主密码"
-              minLength={authMode === 'setup' ? 8 : undefined}
-              required
-            />
+            <div className="inline-input auth-password-input">
+              <input
+                autoFocus
+                type={showMasterPassword ? 'text' : 'password'}
+                value={masterPassword}
+                onChange={event => setMasterPassword(event.target.value)}
+                placeholder="输入主密码，可留空"
+              />
+              <button
+                className="icon-button inset"
+                type="button"
+                title={showMasterPassword ? '隐藏主密码' : '显示主密码'}
+                onClick={() => setShowMasterPassword(value => !value)}
+              >
+                {showMasterPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
+              </button>
+            </div>
             {authError && (
               <p className="inline-error">
                 <AlertCircle size={15} aria-hidden="true" />
@@ -577,11 +683,76 @@ export default function App() {
             <button className="icon-button" type="button" title="导出明文 JSON" onClick={handlePlaintextExport}>
               <Download size={18} aria-hidden="true" />
             </button>
+            <button
+              className="icon-button danger"
+              type="button"
+              title="清空金库数据"
+              onClick={() => void handleResetVaultData()}
+            >
+              <Trash2 size={18} aria-hidden="true" />
+            </button>
+            <button
+              className="icon-button"
+              type="button"
+              title="更改主密码"
+              onClick={toggleMasterPasswordChange}
+            >
+              <KeyRound size={18} aria-hidden="true" />
+            </button>
             <button className="primary-button compact" type="button" onClick={openAddForm}>
               <Plus size={17} aria-hidden="true" />
               新增
             </button>
           </section>
+
+          {isChangeMasterOpen && (
+            <section className="edit-panel security-panel" aria-label="更改主密码">
+              <div className="section-title">
+                <KeyRound size={16} aria-hidden="true" />
+                <h2>更改主密码</h2>
+              </div>
+              <form className="master-password-form" onSubmit={handleChangeMasterPassword}>
+                <label>
+                  新主密码
+                  <div className="inline-input">
+                    <input
+                      type={showNextMasterPassword ? 'text' : 'password'}
+                      value={nextMasterPassword}
+                      onChange={event => setNextMasterPassword(event.target.value)}
+                      placeholder="可留空"
+                    />
+                    <button
+                      className="icon-button inset"
+                      type="button"
+                      title={showNextMasterPassword ? '隐藏主密码' : '显示主密码'}
+                      onClick={() => setShowNextMasterPassword(value => !value)}
+                    >
+                      {showNextMasterPassword ? (
+                        <EyeOff size={17} aria-hidden="true" />
+                      ) : (
+                        <Eye size={17} aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                </label>
+                <p className="field-hint">可留空；空主密码风险较高，建议尽快设置主密码。</p>
+                {changeMasterError && (
+                  <p className="inline-error">
+                    <AlertCircle size={15} aria-hidden="true" />
+                    {changeMasterError}
+                  </p>
+                )}
+                <div className="form-actions">
+                  <button className="secondary-button" type="button" onClick={resetMasterPasswordChange}>
+                    取消
+                  </button>
+                  <button className="primary-button compact" type="submit">
+                    保存
+                  </button>
+                </div>
+              </form>
+            </section>
+          )}
 
           {isFormOpen && (
             <section className="edit-panel" aria-label={editingId ? '编辑记录' : '新增记录'}>
