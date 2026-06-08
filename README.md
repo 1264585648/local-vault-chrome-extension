@@ -86,3 +86,7 @@ npm run build
 - 这份短时会话不会写入 `chrome.storage.local`、`chrome.storage.session` 或 `localStorage`。
 - 由于 MV3 service worker 会被 Chrome 回收，短时会话可能早于选择的分钟数失效。这是安全模型的一部分。
 - 真正上线前仍需要做威胁建模、依赖审计和扩展商店权限审查。
+
+## ???
+
+????? MIT License??? [LICENSE](LICENSE)?
