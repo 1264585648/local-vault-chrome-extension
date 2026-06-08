@@ -47,7 +47,8 @@ describe('app copy and dangerous toolbar controls', () => {
     const app = readProjectFile('src/App.tsx');
 
     expect(app).toContain('LogOut');
-    expect(app).toContain('退出登陆');
+    expect(app).toContain('title="退出登陆"');
+    expect(app).toContain('退出');
     expect(app).not.toMatch(/>\s*锁定\s*</);
   });
 

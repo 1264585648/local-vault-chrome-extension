@@ -1,5 +1,5 @@
 import type { SessionDurationMinutes } from './sessionPolicy';
-import type { Credential } from './types';
+import { normalizeCredentials, type Credential } from './types';
 
 export interface SessionPayload {
   credentials: Credential[];
@@ -28,7 +28,7 @@ const INACTIVE_STATUS: SessionStatus = {
 
 function clonePayload(payload: SessionPayload): SessionPayload {
   return {
-    credentials: payload.credentials.map(credential => ({ ...credential })),
+    credentials: normalizeCredentials(payload.credentials),
     masterPassword: payload.masterPassword
   };
 }

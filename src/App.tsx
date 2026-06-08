@@ -33,13 +33,20 @@ import {
   type SessionDurationMinutes
 } from './sessionPolicy';
 import { getTotpTimeLeft, generateTotp } from './totp';
-import type { Credential, EncryptedVault } from './types';
+import {
+  getCredentialTitleFallback,
+  MAX_CREDENTIAL_TITLE_LENGTH,
+  normalizeCredentialTitle,
+  type Credential,
+  type EncryptedVault
+} from './types';
 import { decryptVault, encryptVault } from './vaultCrypto';
 import { loadVault, saveVault } from './vaultStorage';
 
 type AppState = 'loading' | 'setup' | 'locked' | 'unlocked';
 
 interface CredentialForm {
+  title: string;
   website: string;
   username: string;
   password: string;
@@ -47,6 +54,7 @@ interface CredentialForm {
 }
 
 const EMPTY_FORM: CredentialForm = {
+  title: '',
   website: '',
   username: '',
   password: '',
@@ -75,12 +83,52 @@ const COMMON_WEBSITES = [
   'zhihu.com'
 ];
 
+interface CredentialGroup {
+  domain: string;
+  website: string;
+  credentials: Credential[];
+}
+
 function sortCredentials(credentials: Credential[]): Credential[] {
-  return [...credentials].sort((left, right) => left.website.localeCompare(right.website));
+  return [...credentials].sort((left, right) => {
+    const websiteOrder = normalizeDomain(left.website).localeCompare(normalizeDomain(right.website));
+    if (websiteOrder !== 0) {
+      return websiteOrder;
+    }
+
+    const titleOrder = getCredentialTitleFallback(left).localeCompare(getCredentialTitleFallback(right));
+    if (titleOrder !== 0) {
+      return titleOrder;
+    }
+
+    return left.username.localeCompare(right.username);
+  });
 }
 
 function normalizeDomain(value: string): string {
   return value.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0] || value;
+}
+
+function groupCredentials(credentials: Credential[]): CredentialGroup[] {
+  const grouped = new Map<string, CredentialGroup>();
+
+  for (const credential of sortCredentials(credentials)) {
+    const domain = normalizeDomain(credential.website);
+    const key = domain.toLowerCase();
+    const group = grouped.get(key);
+
+    if (group) {
+      group.credentials.push(credential);
+    } else {
+      grouped.set(key, {
+        domain,
+        website: credential.website,
+        credentials: [credential]
+      });
+    }
+  }
+
+  return [...grouped.values()];
 }
 
 function formatRemaining(seconds: number | null): string {
@@ -222,12 +270,19 @@ export default function App() {
     }
 
     return credentials.filter(credential => {
+      const title = getCredentialTitleFallback(credential);
+      const domain = normalizeDomain(credential.website);
       return (
+        title.toLowerCase().includes(needle) ||
         credential.website.toLowerCase().includes(needle) ||
+        domain.toLowerCase().includes(needle) ||
         credential.username.toLowerCase().includes(needle)
       );
     });
   }, [credentials, searchTerm]);
+
+  const credentialGroups = useMemo(() => groupCredentials(filteredCredentials), [filteredCredentials]);
+  const allCredentialGroupCount = useMemo(() => groupCredentials(credentials).length, [credentials]);
 
   async function saveSessionForDuration(
     duration: SessionDurationMinutes,
@@ -382,9 +437,9 @@ export default function App() {
     setShowFormPassword(false);
   }
 
-  function openAddForm() {
+  function openAddForm(website = '') {
     resetMasterPasswordChange();
-    setFormData(EMPTY_FORM);
+    setFormData({ ...EMPTY_FORM, website });
     setEditingId(null);
     setIsFormOpen(true);
     setShowFormPassword(false);
@@ -393,6 +448,7 @@ export default function App() {
   function openEditForm(credential: Credential) {
     resetMasterPasswordChange();
     setFormData({
+      title: getCredentialTitleFallback(credential),
       website: credential.website,
       username: credential.username,
       password: credential.password,
@@ -405,7 +461,9 @@ export default function App() {
 
   async function handleSubmitCredential(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const trimmedTitle = normalizeCredentialTitle(formData.title);
     const trimmedWebsite = formData.website.trim();
+    const trimmedUsername = formData.username.trim();
     const trimmedSecret = formData.twoFactorSecret.trim();
 
     if (!trimmedWebsite) {
@@ -418,6 +476,7 @@ export default function App() {
       return;
     }
 
+    const nextTitle = trimmedTitle || normalizeCredentialTitle(trimmedUsername || trimmedWebsite);
     const now = new Date().toISOString();
     const nextCredentials = editingId
       ? credentials.map(credential =>
@@ -425,7 +484,9 @@ export default function App() {
             ? {
                 ...credential,
                 ...formData,
+                title: nextTitle,
                 website: trimmedWebsite,
+                username: trimmedUsername,
                 twoFactorSecret: trimmedSecret,
                 updatedAt: now
               }
@@ -435,8 +496,9 @@ export default function App() {
           ...credentials,
           {
             id: crypto.randomUUID(),
+            title: nextTitle,
             website: trimmedWebsite,
-            username: formData.username.trim(),
+            username: trimmedUsername,
             password: formData.password,
             twoFactorSecret: trimmedSecret,
             createdAt: now
@@ -571,7 +633,11 @@ export default function App() {
           </div>
           <div>
             <h1>本地密码库</h1>
-            <p>{appState === 'unlocked' ? `${credentials.length} 条记录` : '离线加密保存'}</p>
+            <p>
+              {appState === 'unlocked'
+                ? `${allCredentialGroupCount} 个网页分组 · ${credentials.length} 个账号`
+                : '离线加密保存'}
+            </p>
           </div>
         </div>
         {appState === 'unlocked' && (
@@ -582,9 +648,9 @@ export default function App() {
               remainingSeconds={remainingSeconds}
               onChange={event => void handleSessionDurationChange(event.target.value)}
             />
-            <button className="ghost-button header-lock" type="button" onClick={() => void lockVault()}>
+            <button className="ghost-button header-lock" type="button" title="退出登陆" onClick={() => void lockVault()}>
               <LogOut size={16} aria-hidden="true" />
-              退出登陆
+              退出
             </button>
           </div>
         )}
@@ -642,7 +708,7 @@ export default function App() {
               <Search size={17} aria-hidden="true" />
               <input
                 type="search"
-                placeholder="搜索网站或账号"
+                placeholder="标题/账号/网页"
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
               />
@@ -665,7 +731,7 @@ export default function App() {
             >
               <KeyRound size={18} aria-hidden="true" />
             </button>
-            <button className="primary-button compact" type="button" onClick={openAddForm}>
+            <button className="primary-button compact" type="button" onClick={() => openAddForm()}>
               <Plus size={17} aria-hidden="true" />
               新增
             </button>
@@ -721,14 +787,14 @@ export default function App() {
           )}
 
           {isFormOpen && (
-            <section className="edit-panel" aria-label={editingId ? '编辑记录' : '新增记录'}>
+            <section className="edit-panel" aria-label={editingId ? '编辑账号' : '新增账号'}>
               <div className="section-title">
                 {editingId ? <Edit2 size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
-                <h2>{editingId ? '编辑记录' : '新增记录'}</h2>
+                <h2>{editingId ? '编辑账号' : '新增账号'}</h2>
               </div>
               <form className="credential-form" onSubmit={handleSubmitCredential}>
                 <label>
-                  网站名称 / URL
+                  网页 / URL
                   <input
                     type="text"
                     list="common-websites"
@@ -736,6 +802,25 @@ export default function App() {
                     onChange={event => setFormData(current => ({ ...current, website: event.target.value }))}
                     placeholder="例如 github.com"
                     required
+                  />
+                </label>
+                <label>
+                  <span className="label-row">
+                    标题
+                    <span>{formData.title.length}/{MAX_CREDENTIAL_TITLE_LENGTH}</span>
+                  </span>
+                  <input
+                    className="title-input"
+                    type="text"
+                    value={formData.title}
+                    maxLength={MAX_CREDENTIAL_TITLE_LENGTH}
+                    onChange={event =>
+                      setFormData(current => ({
+                        ...current,
+                        title: normalizeCredentialTitle(event.target.value)
+                      }))
+                    }
+                    placeholder="例如 工作 GitHub"
                   />
                 </label>
                 <label>
@@ -804,20 +889,21 @@ export default function App() {
           )}
 
           <section className="credential-list" aria-label="账号列表">
-            {filteredCredentials.length === 0 ? (
+            {credentialGroups.length === 0 ? (
               <div className="empty-state">
                 <FileJson size={44} aria-hidden="true" />
                 <h2>{searchTerm ? '没有匹配记录' : '暂无记录'}</h2>
                 <p>{searchTerm ? '换个关键词试试。' : '新增账号，或导入 JSON / CSV / 加密备份。'}</p>
               </div>
             ) : (
-              filteredCredentials.map(credential => (
-                <CredentialRow
-                  credential={credential}
-                  key={credential.id}
+              credentialGroups.map(group => (
+                <CredentialGroupSection
+                  group={group}
+                  key={group.domain.toLowerCase()}
+                  onAdd={() => openAddForm(group.website)}
                   onCopy={handleCopy}
-                  onDelete={() => void handleDelete(credential.id)}
-                  onEdit={() => openEditForm(credential)}
+                  onDelete={handleDelete}
+                  onEdit={openEditForm}
                 />
               ))
             )}
@@ -856,6 +942,48 @@ function SessionSelect({ compact = false, value, remainingSeconds, onChange }: S
   );
 }
 
+interface CredentialGroupSectionProps {
+  group: CredentialGroup;
+  onAdd: () => void;
+  onCopy: (text: string, label: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onEdit: (credential: Credential) => void;
+}
+
+function CredentialGroupSection({ group, onAdd, onCopy, onDelete, onEdit }: CredentialGroupSectionProps) {
+  const initial = group.domain.slice(0, 1).toUpperCase() || '?';
+
+  return (
+    <article className="credential-group" aria-label={`${group.domain} 账号分组`}>
+      <div className="group-header">
+        <div className="site-badge" aria-hidden="true">
+          {initial}
+        </div>
+        <div className="group-copy">
+          <h3 title={group.website}>{group.domain}</h3>
+        </div>
+        <div className="group-meta">
+          <span>{group.credentials.length} 账号</span>
+          <button className="group-add-button" type="button" title="在该网页下新增账号" onClick={onAdd}>
+            <Plus size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      <div className="group-rows">
+        {group.credentials.map(credential => (
+          <CredentialRow
+            credential={credential}
+            key={credential.id}
+            onCopy={onCopy}
+            onDelete={() => void onDelete(credential.id)}
+            onEdit={() => onEdit(credential)}
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
 interface CredentialRowProps {
   credential: Credential;
   onCopy: (text: string, label: string) => Promise<void>;
@@ -867,8 +995,7 @@ function CredentialRow({ credential, onCopy, onDelete, onEdit }: CredentialRowPr
   const [showDetails, setShowDetails] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [timeLeft, setTimeLeft] = useState(30);
-  const domain = normalizeDomain(credential.website);
-  const initial = domain.slice(0, 1).toUpperCase() || '?';
+  const title = getCredentialTitleFallback(credential);
 
   useEffect(() => {
     if (!credential.twoFactorSecret) {
@@ -902,11 +1029,8 @@ function CredentialRow({ credential, onCopy, onDelete, onEdit }: CredentialRowPr
   return (
     <article className="credential-row">
       <div className="row-main">
-        <div className="site-badge" aria-hidden="true">
-          {initial}
-        </div>
-        <div className="site-copy">
-          <h3 title={credential.website}>{credential.website}</h3>
+        <div className="account-copy">
+          <h4 title={title}>{title}</h4>
           <button
             className="text-button"
             type="button"
@@ -956,6 +1080,13 @@ function CredentialRow({ credential, onCopy, onDelete, onEdit }: CredentialRowPr
       </div>
       {showDetails && (
         <div className="detail-panel">
+          <div>
+            <span>网页 / URL</span>
+            <code>{credential.website || '未填写'}</code>
+          </div>
+          <button className="icon-button" type="button" title="复制网页" onClick={() => onCopy(credential.website, '网页')}>
+            <Copy size={16} aria-hidden="true" />
+          </button>
           <div>
             <span>密码明文</span>
             <code>{credential.password || '未填写'}</code>

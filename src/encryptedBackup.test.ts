@@ -5,6 +5,7 @@ import type { Credential } from './types';
 const credentials: Credential[] = [
   {
     id: 'github',
+    title: '工作 GitHub',
     website: 'github.com',
     username: 'octo@example.com',
     password: 'correct horse battery staple',

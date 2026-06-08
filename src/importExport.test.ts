@@ -7,6 +7,7 @@ describe('parseCredentialImport', () => {
       'backup.json',
       JSON.stringify([
         {
+          title: '工作 GitHub',
           url: 'https://github.com',
           email: 'octo@example.com',
           pass: 'secret',
@@ -20,6 +21,7 @@ describe('parseCredentialImport', () => {
     expect(imported).toEqual([
       {
         id: 'fixed-id',
+        title: '工作 GitHub',
         website: 'https://github.com',
         username: 'octo@example.com',
         password: 'secret',
@@ -39,6 +41,25 @@ describe('parseCredentialImport', () => {
 
     expect(imported[0].password).toBe('pa,ss');
     expect(imported[0].website).toBe('mail.example.com');
+    expect(imported[0].title).toBe('me@example.com');
+  });
+
+  it('limits imported titles to 20 characters', () => {
+    const imported = parseCredentialImport(
+      'backup.json',
+      JSON.stringify([
+        {
+          title: '这是一个超过二十个字符的账号标题应该被截断',
+          website: 'example.com',
+          username: 'user@example.com',
+          password: 'secret'
+        }
+      ]),
+      () => 'title-id',
+      () => '2026-06-07T10:00:00.000Z'
+    );
+
+    expect(imported[0].title).toBe('这是一个超过二十个字符的账号标题应该被截');
   });
 
   it('rejects unsupported file formats', () => {
@@ -52,6 +73,7 @@ describe('rekeyImportedCredentials', () => {
       [
         {
           id: 'duplicate-id',
+          title: '工作 GitHub',
           website: 'github.com',
           username: 'octo@example.com',
           password: 'secret',
@@ -66,6 +88,7 @@ describe('rekeyImportedCredentials', () => {
     expect(imported).toEqual([
       {
         id: 'fresh-id',
+        title: '工作 GitHub',
         website: 'github.com',
         username: 'octo@example.com',
         password: 'secret',

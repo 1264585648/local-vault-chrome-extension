@@ -6,6 +6,7 @@ import { saveVault, VAULT_STORAGE_KEY, VAULT_RESET_MARKER_KEY } from './vaultSto
 
 const credential: Credential = {
   id: 'test-record',
+  title: '测试账号',
   website: 'example.com',
   username: 'user@example.com',
   password: 'test-password',

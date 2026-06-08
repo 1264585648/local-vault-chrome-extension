@@ -11,6 +11,7 @@ import type { Credential } from './types';
 const credentials: Credential[] = [
   {
     id: 'mail',
+    title: '工作邮箱',
     website: 'mail.example.com',
     username: 'me@example.com',
     password: 'secret',

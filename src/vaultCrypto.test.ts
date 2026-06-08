@@ -7,6 +7,7 @@ describe('vault crypto', () => {
     const credentials: Credential[] = [
       {
         id: 'github',
+        title: '工作 GitHub',
         website: 'github.com',
         username: 'octo@example.com',
         password: 'correct horse battery staple',
@@ -38,6 +39,7 @@ describe('vault crypto', () => {
       [
         {
           id: 'mail',
+          title: '工作邮箱',
           website: 'mail.example.com',
           username: 'me',
           password: 'secret',
@@ -51,5 +53,25 @@ describe('vault crypto', () => {
 
     expect(second.salt).toBe(first.salt);
     await expect(decryptVault(second, 'master-password')).resolves.toHaveLength(1);
+  });
+
+  it('adds a bounded title when decrypting legacy credentials without one', async () => {
+    const encrypted = await encryptVault(
+      [
+        {
+          id: 'legacy',
+          website: 'legacy.example.com',
+          username: 'legacy@example.com',
+          password: 'secret',
+          twoFactorSecret: '',
+          createdAt: '2026-06-07T10:00:00.000Z'
+        } as Credential
+      ],
+      'master-password'
+    );
+
+    const [credential] = await decryptVault(encrypted, 'master-password');
+
+    expect(credential.title).toBe('legacy@example.com');
   });
 });

@@ -1,4 +1,4 @@
-import type { Credential } from './types';
+import { normalizeCredential, normalizeCredentialTitle, type Credential } from './types';
 
 type ImportedRecord = Record<string, unknown>;
 
@@ -92,6 +92,12 @@ function normalizeRecord(
 ): Credential {
   return {
     id: idFactory(),
+    title: normalizeCredentialTitle(
+      readAlias(record, ['title', 'Title', 'label', 'Label', 'displayName', 'DisplayName', '标题']) ||
+        readAlias(record, ['username', 'Username', 'login', 'Login', 'email', 'Email', 'account', 'Account']) ||
+        readAlias(record, ['website', 'Website', 'url', 'URL', 'name', 'Name', 'domain', 'Domain']) ||
+        '未命名账号'
+    ),
     website:
       readAlias(record, ['website', 'Website', 'url', 'URL', 'name', 'Name', 'domain', 'Domain']) ||
       '未命名网站',
@@ -127,7 +133,8 @@ export function parseCredentialImport(
 
 export function toPlaintextExport(credentials: Credential[]): string {
   return JSON.stringify(
-    credentials.map(({ website, username, password, twoFactorSecret }) => ({
+    credentials.map(({ title, website, username, password, twoFactorSecret }) => ({
+      title,
       website,
       username,
       password,
@@ -143,10 +150,12 @@ export function rekeyImportedCredentials(
   idFactory: () => string = () => crypto.randomUUID(),
   nowFactory = () => new Date().toISOString()
 ): Credential[] {
-  return credentials.map(credential => ({
-    ...credential,
-    id: idFactory(),
-    createdAt: nowFactory(),
-    updatedAt: undefined
-  }));
+  return credentials.map(credential =>
+    normalizeCredential({
+      ...credential,
+      id: idFactory(),
+      createdAt: nowFactory(),
+      updatedAt: undefined
+    })
+  );
 }

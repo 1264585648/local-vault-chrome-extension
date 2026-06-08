@@ -8,6 +8,8 @@
 - 新建密码库使用 600,000 次 PBKDF2 迭代；旧密码库按加密对象内记录的迭代数解锁。
 - 加密备份导出为 `encrypted_backup` JSON，备份内容再次使用当前主密码加密，不包含账号、密码、TOTP 明文。
 - 加密备份导入会自动识别 schema，使用当前主密码解密并合并；旧明文 JSON/CSV 仍兼容。
+- 账号记录包含 `title`、`website`、`username`、`password`、`twoFactorSecret` 等字段；`title` 是 20 个字符以内的账号标题，用于区分同一网页下的多个账号。
+- 旧密码库或旧导入文件没有 `title` 时，会自动用账号或网页生成兜底标题，解锁后可继续编辑保存。
 - 短时会话支持：本次弹窗、5 分钟、15 分钟、30 分钟、60 分钟，默认 15 分钟。
 - 短时会话只放在 background service worker 的内存中，不写入 storage。浏览器回收 service worker 或扩展进程重启后，会话会失效，需要重新输入主密码。
 
@@ -15,7 +17,8 @@
 
 - 整体是安全工具型产品界面：克制、紧凑、偏工作流，不做营销式首页。
 - 视觉继承原型的蓝靛色安全感，用浅灰蓝背景、白色表面、危险/提示色做辅助。
-- 信息结构保持插件弹窗友好：顶部状态栏、会话时长选择、搜索与导入导出工具栏、内联新增/编辑面板、紧凑列表行。
+- 信息结构保持插件弹窗友好：顶部状态栏、会话时长选择、搜索与导入导出工具栏、内联新增/编辑面板、按网页分组的账号列表。
+- 网页 / URL 只在分组头展示；账号行展示账号标题、账号名、2FA 验证码和操作按钮，避免同一网页下多账号时重复显示网页。
 - 明文密码和 2FA 密钥默认隐藏。加密导出是默认导出入口，明文导出保留为带确认的辅助入口。
 
 ## 项目截图
@@ -24,9 +27,9 @@
 
 ![设置或解锁密码库](docs/images/01-create-or-unlock-password-library.png)
 
-![密码库列表、搜索和退出登陆](docs/images/02-password-library-list.png)
+![按网页分组的密码库列表](docs/images/02-password-library-list.png)
 
-![新增账号记录](docs/images/03-add-credential.png)
+![新增账号标题和账号记录](docs/images/03-add-credential.png)
 
 ![复制密码提示](docs/images/04-copy-password-toast.png)
 
@@ -40,7 +43,7 @@ npm run build
 然后在 Chrome 中打开 `chrome://extensions`，开启“开发者模式”，选择“加载已解压的扩展程序”，目录选择：
 
 ```text
-C:\Users\Administrator\Desktop\密码管理器\dist
+C:\Users\zhuxuan\Desktop\密码库\local-vault-chrome-extension\dist
 ```
 
 开发调试页面：
@@ -61,7 +64,7 @@ npm run build
 
 - 主密码库加密/解密、错误主密码、复用 salt 写入。
 - 加密备份导出不含明文、错误密码拒绝、schema 校验。
-- JSON/CSV 导入解析、带逗号 CSV、导入记录重新分配 ID。
+- JSON/CSV 导入解析、标题字段兼容与 20 字截断、带逗号 CSV、导入记录重新分配 ID。
 - 短时会话选项、默认推荐项、未过期恢复、过期清理。
 - RFC 6238 TOTP 测试向量、Base32 兼容输入、错误密钥。
 - 密码生成与 TOTP 密钥格式校验。

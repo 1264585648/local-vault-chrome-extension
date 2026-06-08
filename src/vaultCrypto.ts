@@ -1,4 +1,4 @@
-import type { Credential, EncryptedVault } from './types';
+import { normalizeCredentials, type Credential, type EncryptedVault } from './types';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -110,7 +110,7 @@ export async function decryptVault(
       toArrayBuffer(encrypted)
     );
 
-    return JSON.parse(decoder.decode(decrypted)) as Credential[];
+    return normalizeCredentials(JSON.parse(decoder.decode(decrypted)));
   } catch {
     throw new Error('主密码不正确或密码库数据已损坏');
   }
