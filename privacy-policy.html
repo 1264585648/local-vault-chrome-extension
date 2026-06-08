@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local Vault Privacy Policy</title>
+    <style>
+      body {
+        margin: 0;
+        color: #172033;
+        background: #f7f9fc;
+        font: 16px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        box-sizing: border-box;
+        width: min(860px, 100%);
+        margin: 0 auto;
+        padding: 48px 24px 64px;
+      }
+
+      article {
+        border: 1px solid #d9e1ec;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 32px;
+      }
+
+      h1,
+      h2 {
+        line-height: 1.25;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 2rem;
+      }
+
+      h2 {
+        margin: 32px 0 12px;
+        font-size: 1.25rem;
+      }
+
+      p,
+      ul {
+        margin: 0 0 16px;
+      }
+
+      code {
+        border-radius: 4px;
+        background: #eef3f8;
+        padding: 2px 5px;
+      }
+
+      a {
+        color: #145bd6;
+      }
+
+      .effective-date {
+        color: #5d6b7c;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>Local Vault Privacy Policy</h1>
+        <p class="effective-date">Effective date: 2026-06-08</p>
+
+        <h2>Overview</h2>
+        <p>
+          Local Vault is an offline-first Chrome extension for storing account titles, websites, usernames,
+          passwords, and 2FA secrets on the user's own device. The extension does not provide a cloud sync
+          account, does not operate a backend service, does not upload vault data, and does not sell or share
+          user data.
+        </p>
+
+        <h2>Data Processed</h2>
+        <p>The extension processes the following data locally on the user's device:</p>
+        <ul>
+          <li>Account records: title, website / URL, username, password, and 2FA Base32 secret.</li>
+          <li>
+            Master password: used locally to derive an encryption key; the master password is not written to
+            persistent storage.
+          </li>
+          <li>
+            Short session data: to reduce repeated master password entry, the extension may temporarily keep
+            unlocked account plaintext and the master password in background service worker memory until the
+            session expires, the user exits, or the browser reclaims the extension process.
+          </li>
+          <li>Import / export files: JSON, CSV, and encrypted backup files that the user explicitly selects or exports.</li>
+          <li>
+            Clipboard writes: when the user clicks a copy button, the extension writes the selected account,
+            password, or verification code to the system clipboard.
+          </li>
+        </ul>
+
+        <h2>Storage</h2>
+        <ul>
+          <li>
+            The vault is encrypted with AES-GCM 256 using a key derived from the master password through
+            PBKDF2-HMAC-SHA256.
+          </li>
+          <li>The encrypted vault is stored in <code>chrome.storage.local</code>.</li>
+          <li>
+            In the development/debug environment, when <code>chrome.storage.local</code> is unavailable, the
+            extension falls back to browser <code>localStorage</code>.
+          </li>
+          <li>
+            Encrypted backup files are exported only when the user chooses to export them, and the user is
+            responsible for storing and managing those files.
+          </li>
+        </ul>
+
+        <h2>Data Transfer and Sharing</h2>
+        <p>
+          The extension does not send accounts, passwords, 2FA secrets, master passwords, or backup files to
+          developer servers or third-party servers. The current extension does not include analytics SDKs,
+          advertising SDKs, remote analytics, remote logging, or cloud sync.
+        </p>
+        <p>The extension does not sell, rent, share, or transfer user data.</p>
+
+        <h2>Permission Usage</h2>
+        <ul>
+          <li><code>storage</code>: Saves the locally encrypted password vault.</li>
+          <li>
+            <code>clipboardWrite</code>: Writes an account, password, or verification code to the clipboard only
+            when the user clicks a copy button.
+          </li>
+        </ul>
+
+        <h2>User Control</h2>
+        <p>Users can:</p>
+        <ul>
+          <li>Add, edit, and delete account records.</li>
+          <li>Sign out manually and clear the short session.</li>
+          <li>Export encrypted backups.</li>
+          <li>Export plaintext JSON after confirming the risk.</li>
+          <li>Uninstall the extension from the browser extensions page; Chrome will clean up extension local storage according to browser rules.</li>
+        </ul>
+
+        <h2>Security Notes</h2>
+        <p>
+          If the master password is lost, the developer cannot recover the encrypted vault. Plaintext export
+          files contain sensitive information and should be saved only on trusted devices, then cleaned up after
+          use.
+        </p>
+
+        <h2>Chrome Web Store Limited Use</h2>
+        <p>
+          The use of information received from Chrome APIs will adhere to the Chrome Web Store User Data Policy,
+          including the Limited Use requirements.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+          For privacy or security feedback, use GitHub Issues:
+          <a href="https://github.com/1264585648/local-vault-chrome-extension/issues">https://github.com/1264585648/local-vault-chrome-extension/issues</a>
+        </p>
+      </article>
+    </main>
+  </body>
+</html>
