@@ -33,6 +33,16 @@
 
 ![复制密码提示](docs/images/04-copy-password-toast.png)
 
+## Chrome Web Store 素材
+
+上架素材集中在 `docs/store-assets/`：
+
+- 发布包：`release/local-vault-chrome-extension-0.1.0.zip`
+- 隐私政策：`docs/store-assets/privacy-policy.md`
+- 商店文案：`docs/store-assets/chrome-web-store-listing.md`
+- 高清截图：`docs/store-assets/screenshots/`
+- 小型宣传图：`docs/store-assets/promo/small-promo-440x280.png`
+
 ## 加载插件
 
 ```bash
